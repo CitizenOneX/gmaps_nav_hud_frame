@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
     <application
         android:label="gmaps_nav_hud_frame"
         android:name="${applicationName}"
@@ -30,6 +33,22 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <receiver android:name="im.zoe.labs.flutter_notification_listener.RebootBroadcastReceiver"
+            android:exported="false"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        <service android:name="im.zoe.labs.flutter_notification_listener.NotificationsHandlerService"
+            android:exported="false"
+            android:label="Flutter Notifications Handler"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
