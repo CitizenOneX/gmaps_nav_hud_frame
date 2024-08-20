@@ -82,14 +82,13 @@ class _NotificationsLogState extends State<NotificationsLog> {
   }
 
   void onData(NotificationEvent event) {
-    setState(() {
-      _log.add(event);
-    });
-
     print(event.toString());
 
     if (event.packageName != null && event.packageName == "com.google.android.apps.maps") {
       print('---------------- MAPS NOTIFICATION ------------');
+      setState(() {
+        _log.add(event);
+      });
     }
     else {
       print('---------------- other notification ------------');
@@ -101,14 +100,22 @@ class _NotificationsLogState extends State<NotificationsLog> {
     setState(() {
       _loading = true;
     });
+
     var hasPermission = (await NotificationsListener.hasPermission) ?? false;
+
     if (!hasPermission) {
       print("no permission, so open settings");
       NotificationsListener.openPermissionSettings();
+      setState(() {
+        _loading = false;
+      });
       return;
     }
     else {
       print("permission: $hasPermission");
+      // TODO seems not to update hasPermission to false after stopService
+      // so force an openPermissionSettings on startListening every time
+      NotificationsListener.openPermissionSettings();
     }
 
     var isRunning = (await NotificationsListener.isRunning) ?? false;
@@ -142,54 +149,34 @@ class _NotificationsLogState extends State<NotificationsLog> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Listener Example'),
-        actions: [
-          IconButton(
-              onPressed: () {
-                print("TODO:");
-              },
-              icon: const Icon(Icons.settings))
-        ],
+        title: const Text('Frame Navigation HUD'),
       ),
       body: Center(
-          child: ListView.builder(
-              itemCount: _log.length,
-              reverse: true,
-              itemBuilder: (BuildContext context, int idx) {
-                final entry = _log[idx];
-                return ListTile(
-                    onTap: () {
-                      entry.tap();
-                    },
-                     trailing:
-                         entry.hasLargeIcon! ? Image.memory(entry.largeIcon!, width: 80, height: 80) :
-                           Text(entry.packageName.toString().split('.').last),
-                    title: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(entry.title ?? "<<no title>>"),
-                        Text(entry.text ?? "<<no text>>"),
-                        Text(entry.raw!["subText"] ?? "<<no subText>>"),
-                        Row(
-                          children: [TextButton(
-                                child: const Text("Full"),
-                                onPressed: () async {
-                                  try {
-                                    var data = await entry.getFull();
-                                    print("full notification: $data");
-                                  } catch (e) {
-                                    print(e);
-                                  }
-                                }),
-                          ],
-                        ),
-                        Text(entry.createAt.toString().substring(0, 19)),
-                      ],
-                    ));
-              })),
+        child: ListView.builder(
+          itemCount: _log.length,
+          reverse: true,
+          itemBuilder: (BuildContext context, int idx) {
+            final entry = _log[idx];
+            return ListTile(
+              trailing: entry.hasLargeIcon!
+                  ? Image.memory(entry.largeIcon!, width: 80, height: 80)
+                  : Text(entry.packageName.toString().split('.').last),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(entry.title ?? "<<no title>>",
+                    style: const TextStyle(color: Colors.white, fontSize: 18)),
+                  Text(entry.text ?? "<<no text>>",
+                    style: const TextStyle(color: Colors.white, fontSize: 18)),
+                  Text(entry.raw!["subText"] ?? "<<no subText>>",
+                    style: const TextStyle(color: Colors.white, fontSize: 18)),
+                  Text(entry.createAt.toString().substring(0, 19),
+                    style: const TextStyle(color: Colors.white, fontSize: 12)),
+                ],
+              ));
+          })),
       floatingActionButton: FloatingActionButton(
         onPressed: started ? stopListening : startListening,
-        tooltip: 'Start/Stop sensing',
         child: _loading
             ? const Icon(Icons.close)
             : (started ? const Icon(Icons.stop) : const Icon(Icons.play_arrow)),
