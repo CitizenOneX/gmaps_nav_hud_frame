@@ -25,8 +25,9 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: NotificationsLog(),
+    return MaterialApp(
+      home: const NotificationsLog(),
+      theme: ThemeData.dark(),
     );
   }
 }
@@ -86,6 +87,13 @@ class _NotificationsLogState extends State<NotificationsLog> {
     });
 
     print(event.toString());
+
+    if (event.packageName != null && event.packageName == "com.google.android.apps.maps") {
+      print('---------------- MAPS NOTIFICATION ------------');
+    }
+    else {
+      print('---------------- other notification ------------');
+    }
   }
 
   void startListening() async {
@@ -153,45 +161,27 @@ class _NotificationsLogState extends State<NotificationsLog> {
                     onTap: () {
                       entry.tap();
                     },
-                    // trailing:
-                    //     entry.hasLargeIcon ? Image.memory(entry.largeIcon, width: 80, height: 80) :
-                    //       Text(entry.packageName.toString().split('.').last),
+                     trailing:
+                         entry.hasLargeIcon! ? Image.memory(entry.largeIcon!, width: 80, height: 80) :
+                           Text(entry.packageName.toString().split('.').last),
                     title: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(entry.title ?? "<<no title>>"),
                         Text(entry.text ?? "<<no text>>"),
+                        Text(entry.raw!["subText"] ?? "<<no subText>>"),
                         Row(
-                          children: (entry.actions ?? []).map((act) {
-                            return TextButton(
-                                onPressed: () {
-                                  // semantic is 1 means reply quick
-                                  if (act.semantic == 1) {
-                                    Map<String, dynamic> map = {};
-                                    for (var e in (act.inputs ?? [])) {
-                                      print(
-                                          "set inputs: ${e.label}<${e.resultKey}>");
-                                      map[e.resultKey ?? 'null'] =
-                                          "Auto reply from me";
-                                    }
-                                    act.postInputs(map);
-                                  } else {
-                                    // just tap
-                                    act.tap();
-                                  }
-                                },
-                                child: Text(act.title ?? ''));
-                          }).toList()
-                            ..add(TextButton(
+                          children: [TextButton(
                                 child: const Text("Full"),
                                 onPressed: () async {
                                   try {
                                     var data = await entry.getFull();
-                                    print("full notifaction: $data");
+                                    print("full notification: $data");
                                   } catch (e) {
                                     print(e);
                                   }
-                                })),
+                                }),
+                          ],
                         ),
                         Text(entry.createAt.toString().substring(0, 19)),
                       ],
