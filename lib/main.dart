@@ -48,8 +48,8 @@ class _NotificationsLogState extends State<NotificationsLog> {
 
   @override
   void initState() {
-    initPlatformState();
     super.initState();
+    initPlatformState();
   }
 
   // we must use static method, to handle in background
@@ -85,13 +85,9 @@ class _NotificationsLogState extends State<NotificationsLog> {
     print(event.toString());
 
     if (event.packageName != null && event.packageName == "com.google.android.apps.maps") {
-      print('---------------- MAPS NOTIFICATION ------------');
       setState(() {
         _log.add(event);
       });
-    }
-    else {
-      print('---------------- other notification ------------');
     }
   }
 

@@ -2,7 +2,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
-        android:label="gmaps_nav_hud_frame"
+        android:label="Frame Navigation HUD"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
