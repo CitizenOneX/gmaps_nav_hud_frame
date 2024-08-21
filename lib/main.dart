@@ -27,10 +27,13 @@ class MainApp extends StatefulWidget {
 /// SimpleFrameAppState mixin helps to manage the lifecycle of the Frame connection outside of this file
 class MainAppState extends State<MainApp> with SimpleFrameAppState {
 
-  final List<NotificationEvent> _logList = [];
   ReceivePort port = ReceivePort();
   String _prevText = '';
   Uint8List _prevIcon = Uint8List(0);
+  NotificationEvent? _lastEvent;
+  final TextStyle _style = const TextStyle(color: Colors.white, fontSize: 18);
+  final TextStyle _smallStyle = const TextStyle(color: Colors.white, fontSize: 12);
+
 
   MainAppState() {
     Logger.root.level = Level.INFO;
@@ -84,8 +87,7 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
     // filter notifications for Maps
     if (event.packageName != null && event.packageName == "com.google.android.apps.maps") {
       setState(() {
-        // TODO single latest notification, or list?
-        _logList.add(event);
+        _lastEvent = event;
       });
 
       try {
@@ -189,31 +191,32 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
       home: Scaffold(
         appBar: AppBar(
           title: const Text('Frame Navigation HUD'),
+          actions: [getBatteryWidget()]
         ),
-        body: Center(
-          child: ListView.builder(
-            itemCount: _logList.length,
-            reverse: true,
-            itemBuilder: (BuildContext context, int idx) {
-              final entry = _logList[idx];
-              return ListTile(
-                trailing: entry.hasLargeIcon!
-                    ? Image.memory(entry.largeIcon!, width: 126, height: 126)
-                    : Text(entry.packageName.toString().split('.').last),
-                title: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(entry.title ?? "<<no title>>",
-                      style: const TextStyle(color: Colors.white, fontSize: 18)),
-                    Text(entry.text ?? "<<no text>>",
-                      style: const TextStyle(color: Colors.white, fontSize: 18)),
-                    Text(entry.raw!["subText"] ?? "<<no subText>>",
-                      style: const TextStyle(color: Colors.white, fontSize: 18)),
-                    Text(entry.createAt.toString().substring(0, 19),
-                      style: const TextStyle(color: Colors.white, fontSize: 12)),
-                  ],
-                ));
-            })),
+        body: _lastEvent != null ? Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_lastEvent!.title ?? "", style: _style, textAlign: TextAlign.left,),
+                  Text(_lastEvent!.text ?? "", style: _style),
+                  Text(_lastEvent!.raw!["subText"] ?? "", style: _style),
+                  // phone only - last notification timestamp
+                  Text(_lastEvent!.createAt.toString().substring(0, 19), style: _smallStyle),
+                ]
+              ),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                if (_lastEvent!.hasLargeIcon!) Image.memory(_lastEvent!.largeIcon!, width: 126, height: 126),
+              ],
+            )
+          ],
+        ) : null,
         floatingActionButton: getFloatingActionButtonWidget(const Icon(Icons.navigation), const Icon(Icons.cancel)),
         persistentFooterButtons: getFooterButtonsWidget(),
       )
