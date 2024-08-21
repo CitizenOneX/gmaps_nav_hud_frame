@@ -197,7 +197,7 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -212,7 +212,7 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
             Column(
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
-                if (_lastEvent!.hasLargeIcon!) Image.memory(_lastEvent!.largeIcon!, width: 126, height: 126),
+                if (_lastEvent!.hasLargeIcon!) Image.memory(_lastEvent!.largeIcon!),
               ],
             )
           ],
