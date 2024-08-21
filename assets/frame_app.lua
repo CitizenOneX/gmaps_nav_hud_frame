@@ -1,23 +1,10 @@
 -- we store the data from the host quickly from the data handler interrupt
 -- and wait for the main loop to pick it up for processing/drawing
--- app_data.text is either the text that will be sent to Wikipedia for querying content
---               or the response containing the wiki content (possibly split into query/wiki in future)
--- image.chunk_table is the thumbnail image associated with the Wikipedia page (if present) as rows of bytes from each message
--- TODO supporting multiple images (or text items) concurrently: either differently-named tables here, or a list
--- TODO multiple images will likely still need to be drawn with a fixed palette, so it won't be set and stored per image and might need to be reset afterward?
--- TODO remove initialization of these - only need app_data_raw and app_data initialized to empty tables
--- This was just for illustration only, but they are actually created lazily
---local text_raw = { chunk_table = {}, size = 0, recv_bytes = 0 }
---local image_raw = { chunk_table = {}, size = 0, recv_bytes = 0 }
---local app_data_raw = { TEXT_FLAG = text_raw, IMAGE_FLAG = image_raw }
---local text = { data = '' }
---local image = { data = '', width = 0, height = 0, bpp = 0, num_colors = 0, palette = '' }
---local app_data = { TEXT_FLAG = text, IMAGE_FLAG = image }
-
+-- `app_data/_raw`.`text` is the text of the turn-by-turn directions in the Google Maps notification
+-- `app_data/_raw`.`image` is the directional arrow icon
 
 -- Frame to phone flags
 BATTERY_LEVEL_FLAG = 0x0c
---TODO BATTERY_LEVEL_FLAG = "\x0c"
 
 -- Phone to Frame flags
 TEXT_FLAG = 0x0a
@@ -106,7 +93,7 @@ end
 -- TODO set palette
 function print_image()
     local image = app_data[IMAGE_FLAG]
-    frame.display.bitmap(400, 0, image.width, image.num_colors, 0, image.data)
+    frame.display.bitmap(500, 0, image.width, image.num_colors, 0, image.data)
 end
 
 -- Main app loop
@@ -139,7 +126,7 @@ function app_loop()
                 -- periodic battery level updates
                 local t = frame.time.utc()
                 if (last_batt_update == 0 or (t - last_batt_update) > 180) then
-                    pcall(frame.bluetooth.send, [BATTERY_LEVEL_FLAG] .. string.char(math.floor(frame.battery_level())))
+                    pcall(frame.bluetooth.send, string.char(BATTERY_LEVEL_FLAG) .. string.char(math.floor(frame.battery_level())))
                     last_batt_update = t
                 end
 

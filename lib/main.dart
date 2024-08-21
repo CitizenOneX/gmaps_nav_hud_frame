@@ -92,7 +92,7 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
         // send text to Frame
         String text = '${event.title}\n${event.text}\n${event.raw!["subText"]}';
         if (text != _prevText) {
-          String wrappedText = FrameHelper.wrapText(text, 560, 4);
+          String wrappedText = FrameHelper.wrapText(text, 500, 4);
           await frame?.sendMessage(0x0a, utf8.encode(wrappedText));
           _prevText = text;
         }
