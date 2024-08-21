@@ -4,6 +4,7 @@ import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:es_compression/lz4.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 import 'package:image/image.dart' as img;
@@ -110,17 +111,26 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
             // Ensure the image is loaded correctly
             if (image != null) {
               _log.severe('Image: ${image.width}x${image.height}, ${image.format}, ${image.hasAlpha}, ${image.hasPalette}, ${image.length}');
-              _log.severe('Image bytes: ${image.toUint8List()}');
+              _log.fine('Image bytes: ${image.toUint8List()}');
 
               // quantize the image for pack/send/display to frame
               final qImage = img.quantize(image, numberOfColors: 4, method: img.QuantizeMethod.binary, dither: img.DitherKernel.none, ditherSerpentine: false);
               Uint8List qImageBytes = qImage.toUint8List();
               _log.severe('QuantizedImage: ${qImage.width}x${qImage.height}, ${qImage.format}, ${qImage.hasAlpha}, ${qImage.hasPalette}, ${qImage.palette!.toUint8List()}, ${qImage.length}');
-              _log.severe('QuantizedImage bytes: $qImageBytes');
+              _log.fine('QuantizedImage bytes: $qImageBytes');
+
+              final lz4qImage = lz4.encode(qImageBytes);
+              _log.severe('lz4 qImage: ${lz4qImage.length}');
+              _log.fine('lz4 qImage bytes: $lz4qImage');
 
               // send image message (header and image data) to Frame (split over several packets)
               var imagePayload = makeImagePayload(qImage.width, qImage.height, qImage.palette!.lengthInBytes ~/ 3, qImage.palette!.toUint8List(), qImageBytes);
-              _log.severe('Image Payload: ${imagePayload.length} $imagePayload');
+              _log.severe('Image Payload: ${imagePayload.length}');
+              _log.fine('Image Payload bytes: $imagePayload');
+
+              final lz4Payload = lz4.encode(imagePayload);
+              _log.severe('lz4 image payload: ${lz4Payload.length}');
+              _log.fine('lz4 image payload bytes: $lz4Payload');
 
               await frame?.sendMessage(0x0d, imagePayload);
               _prevIcon = qImageBytes;

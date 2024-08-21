@@ -7,6 +7,7 @@ environment:
   sdk: '>=3.4.4 <4.0.0'
 
 dependencies:
+  es_compression: ^2.0.12
   flutter:
     sdk: flutter
   flutter_blue_plus: ^1.32.12
