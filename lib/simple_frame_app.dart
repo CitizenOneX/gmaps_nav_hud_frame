@@ -331,17 +331,38 @@ mixin SimpleFrameAppState<T extends StatefulWidget> on State<T> {
     frame!.sendBreakSignal();
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // only if there is a frame_app.lua companion app
-    // TODO could load minified frame_app if one exists?
-    bool hasFrameApp = (await AssetManifest.loadFromAssetBundle(rootBundle)).listAssets().contains('assets/frame_app.lua');
-    if (hasFrameApp) {
-      // send our frame_app to the Frame
-      await frame!.uploadScript('frame_app.lua', 'assets/frame_app.lua');
-      await Future.delayed(const Duration(milliseconds: 500));
+    // only if there are lua files to send to Frame (e.g. frame_app.lua companion app, other helper functions, minified versions)
+    List<String> luaFiles = _filterLuaFiles((await AssetManifest.loadFromAssetBundle(rootBundle)).listAssets());
 
-      // kick off the main application loop
-      await frame!.sendString('require("frame_app")', awaitResponse: true);
-      await Future.delayed(const Duration(milliseconds: 500));
+    if (luaFiles.isNotEmpty) {
+      for (var pathFile in luaFiles) {
+        String fileName = pathFile.split('/').last;
+        // send the lua script to the Frame
+        await frame!.uploadScript(fileName, pathFile);
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      // kick off the main application loop: if there is only one lua file, use it;
+      // otherwise require a file called "assets/frame_app.min.lua", or "assets/frame_app.lua"
+      if (luaFiles.length == 1) {
+        String fileName = luaFiles[0].split('/').last; // e.g. "assets/my_file.min.lua" -> "my_file.min.lua"
+        int lastDotIndex = fileName.lastIndexOf(".lua");
+        String bareFileName = fileName.substring(0, lastDotIndex); // e.g. "my_file.min.lua" -> "my_file.min"
+
+        await frame!.sendString('require("$bareFileName")', awaitResponse: true);
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      else if (luaFiles.contains('assets/frame_app.min.lua')) {
+        await frame!.sendString('require("frame_app.min")', awaitResponse: true);
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      else if (luaFiles.contains('assets/frame_app.lua')) {
+        await frame!.sendString('require("frame_app")', awaitResponse: true);
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      else {
+        _log.fine('Multiple Lua files uploaded, but no main file to require()');
+      }
     }
 
     currentState = ApplicationState.ready;
@@ -354,18 +375,52 @@ mixin SimpleFrameAppState<T extends StatefulWidget> on State<T> {
     await frame!.sendBreakSignal();
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // only if there is a frame_app.lua companion app
-    bool hasFrameApp = (await AssetManifest.loadFromAssetBundle(rootBundle)).listAssets().contains('assets/frame_app.lua');
-    if (hasFrameApp) {
-      // clean up by deregistering any handler and deleting any prior script
-      await frame!.sendString('frame.bluetooth.receive_callback(nil);frame.file.remove("frame_app.lua");print(0)', awaitResponse: true);
+    // only if there are lua files uploaded to Frame (e.g. frame_app.lua companion app, other helper functions, minified versions)
+    List<String> luaFiles = _filterLuaFiles((await AssetManifest.loadFromAssetBundle(rootBundle)).listAssets());
+
+    if (luaFiles.isNotEmpty) {
+      // clean up by deregistering any handler
+      await frame!.sendString('frame.bluetooth.receive_callback(nil);print(0)', awaitResponse: true);
       await Future.delayed(const Duration(milliseconds: 500));
+
+      for (var file in luaFiles) {
+        // delete any prior scripts
+        await frame!.sendString('frame.file.remove("${file.split('/').last}");print(0)', awaitResponse: true);
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
     }
 
     currentState = ApplicationState.connected;
     if (mounted) setState(() {});
   }
 
+  /// When given the full list of Assets, return only the Lua files (and give .min.lua minified files precedence)
+  /// Note that file strings will be 'assets/my_file.lua' which we need to find the asset in Flutter,
+  /// but we need to file.split('/').last if we only want the file name when writing/deleting the file on Frame in the root of its filesystem
+  List<String> _filterLuaFiles(List<String> files) {
+    // Create a map to store the base file names without extensions.
+    Map<String, String> luaFilesMap = {};
+
+    for (String file in files) {
+      // Check if the file ends with .lua or .min.lua
+      if (file.endsWith('.lua')) {
+        String baseName;
+        if (file.endsWith('.min.lua')) {
+          baseName = file.replaceAll('.min.lua', '');
+        } else {
+          baseName = file.replaceAll('.lua', '');
+        }
+
+        // Store the file in the map, giving priority to .min.lua files
+        if (!luaFilesMap.containsKey(baseName) || file.endsWith('.min.lua')) {
+          luaFilesMap[baseName] = file;
+        }
+      }
+    }
+
+    // Return the filtered list of Lua files
+    return luaFilesMap.values.toList();
+  }
 
   /// the SimpleFrameApp subclass implements application-specific code
   Future<void> run();
