@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
-import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 import 'package:image/image.dart' as img;
@@ -36,7 +36,7 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
 
 
   MainAppState() {
-    Logger.root.level = Level.FINE;
+    Logger.root.level = Level.INFO;
     Logger.root.onRecord.listen((record) {
       debugPrint('${record.level.name}: [${record.loggerName}] ${record.time}: ${record.message}');
     });
@@ -101,29 +101,29 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
 
         if (event.hasLargeIcon!) {
           Uint8List iconBytes = event.largeIcon!;
-          _log.fine('Icon bytes: ${iconBytes.length}: $iconBytes');
+          _log.finest('Icon bytes: ${iconBytes.length}: $iconBytes');
 
-          if (iconBytes != _prevIcon) {
+          if (!listEquals(iconBytes, _prevIcon)) {
+            _prevIcon = iconBytes;
             // TODO if the maps icons are all 2-color bitmaps, maybe we can pack them and send as an indexed file more easily than quantize()?
             final img.Image? image = img.decodeImage(iconBytes);
 
             // Ensure the image is loaded correctly
             if (image != null) {
-              _log.severe('Image: ${image.width}x${image.height}, ${image.format}, ${image.hasAlpha}, ${image.hasPalette}, ${image.length}');
-              _log.severe('Image bytes: ${image.toUint8List()}');
+              _log.fine('Image: ${image.width}x${image.height}, ${image.format}, ${image.hasAlpha}, ${image.hasPalette}, ${image.length}');
+              _log.finest('Image bytes: ${image.toUint8List()}');
 
               // quantize the image for pack/send/display to frame
               final qImage = img.quantize(image, numberOfColors: 4, method: img.QuantizeMethod.binary, dither: img.DitherKernel.none, ditherSerpentine: false);
               Uint8List qImageBytes = qImage.toUint8List();
-              _log.severe('QuantizedImage: ${qImage.width}x${qImage.height}, ${qImage.format}, ${qImage.hasAlpha}, ${qImage.hasPalette}, ${qImage.palette!.toUint8List()}, ${qImage.length}');
-              _log.severe('QuantizedImage bytes: $qImageBytes');
+              _log.fine('QuantizedImage: ${qImage.width}x${qImage.height}, ${qImage.format}, ${qImage.hasAlpha}, ${qImage.hasPalette}, ${qImage.palette!.toUint8List()}, ${qImage.length}');
+              _log.finest('QuantizedImage bytes: $qImageBytes');
 
               // send image message (header and image data) to Frame (split over several packets)
               var imagePayload = makeImagePayload(qImage.width, qImage.height, qImage.palette!.lengthInBytes ~/ 3, qImage.palette!.toUint8List(), qImageBytes);
-              _log.severe('Image Payload: ${imagePayload.length} $imagePayload');
+              _log.finest('Image Payload: ${imagePayload.length} $imagePayload');
 
               await frame?.sendMessage(0x0d, imagePayload);
-              _prevIcon = qImageBytes;
             }
           }
         }
@@ -148,6 +148,7 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
     else {
       _log.info("has permission, so open settings anyway");
       // TODO seems not to update hasPermission to false after stopService
+      // TODO Occasionally the permission disappears from both approved and denied lists in the UI...?
       // so force an openPermissionSettings on startListening every time
       NotificationsListener.openPermissionSettings();
     }
