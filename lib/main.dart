@@ -178,6 +178,9 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
     _log.info("service stopped: $stopped");
 
     setState(() {
+      _prevText = '';
+      _prevIcon = Uint8List(0);
+      _lastEvent = null;
       currentState = ApplicationState.ready;
     });
   }
