@@ -10,7 +10,9 @@ The heads-up-display of turn-by-turn directions is only recommended for use whil
 
 Known issues include prompting for notification permissions each time (and occasionally the permission doesn't even appear in the approved/not approved lists - uninstall and reinstall as a workaround.) Background mode/phone screen off has not been tested.
 
-Tap to wake Frame, Click "Connect" in the app to connect to Frame, "Start" to load the app to Frame, then click the floating action button to begin. The app will listen for Google Maps live navigation notifications from an existing or new navigation session running on the host device.
+Tap to wake Frame, Click "Connect" in the app to connect to Frame, "Start" to load the app to Frame, then click the navigation floating action button, accept permissions to begin. The app will listen for Google Maps live navigation notifications from an existing or any new navigation session running on the host device and mirror the directions to the Frame display.
+
+"Stop" and "Disconnect" after a session to remove application files from Frame and do a clean bluetooth disconnection from the host device.
 
 ### Frameshots
 ![Frameshot1](docs/frameshot1.jpg)
