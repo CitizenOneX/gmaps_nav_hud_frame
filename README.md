@@ -8,6 +8,10 @@ Using the [flutter_notification_listener](https://pub.dev/packages/flutter_notif
 
 The heads-up-display of turn-by-turn directions is only recommended for use while walking.
 
+Known issues include prompting for notification permissions each time (and occasionally the permission doesn't even appear in the approved/not approved lists - uninstall and reinstall as a workaround.) Background mode/phone screen off has not been tested.
+
+Tap to wake Frame, Click "Connect" in the app to connect to Frame, "Start" to load the app to Frame, then click the floating action button to begin. The app will listen for Google Maps live navigation notifications from an existing or new navigation session running on the host device.
+
 ### Frameshots
 ![Frameshot1](docs/frameshot1.jpg)
 
