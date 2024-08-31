@@ -201,7 +201,7 @@ class BrilliantDevice {
       }
 
       // TODO check throughput difference using withoutResponse: false
-      await _txChannel!.write(data, withoutResponse: true);
+      await _txChannel!.write(data, withoutResponse: false);
     } catch (error) {
       _log.warning("Couldn't send data. $error");
       return Future.error(BrilliantBluetoothException(error.toString()));
@@ -228,13 +228,16 @@ class BrilliantDevice {
     // instead point packetToSend to an UnmodifiableListView range within packetBuffer
     List<int> packetBuffer = List.filled(maxDataLength! + 1, 0x00);
     List<int> packetToSend = packetBuffer;
+    _log.fine('sendMessage: payload size: ${payload.length}');
 
     while (sentBytes < payload.length) {
       if (firstPacket) {
+        _log.fine('sendMessage: first packet');
         firstPacket = false;
 
         if (bytesRemaining < chunksize - 2) {
           // first and final chunk - small payload
+          _log.fine('sendMessage: first and final packet');
           packetBuffer[0] = 0x01;
           packetBuffer[1] = messageFlag & 0xFF;
           packetBuffer[2] = lengthMsb;
@@ -245,6 +248,7 @@ class BrilliantDevice {
         }
         else if (bytesRemaining == chunksize - 2) {
           // first and final chunk - small payload, exact packet size match
+          _log.fine('sendMessage: first and final packet, exact match');
           packetBuffer[0] = 0x01;
           packetBuffer[1] = messageFlag & 0xFF;
           packetBuffer[2] = lengthMsb;
@@ -255,6 +259,7 @@ class BrilliantDevice {
         }
         else {
           // first of many chunks
+          _log.fine('sendMessage: first of many packets');
           packetBuffer[0] = 0x01;
           packetBuffer[1] = messageFlag & 0xFF;
           packetBuffer[2] = lengthMsb;
@@ -267,6 +272,7 @@ class BrilliantDevice {
       else {
         // not the first packet
         if (bytesRemaining < chunksize) {
+          _log.fine('sendMessage: not the first packet, final packet');
           // final data chunk, smaller than chunksize
           packetBuffer[0] = 0x01;
           packetBuffer[1] = messageFlag & 0xFF;
@@ -275,6 +281,7 @@ class BrilliantDevice {
           packetToSend = UnmodifiableListView(packetBuffer.getRange(0, bytesRemaining + 2));
         }
         else  {
+          _log.fine('sendMessage: not the first packet, non-final packet or exact match final packet');
           // non-final data chunk or final chunk with exact packet size match
           packetBuffer[0] = 0x01;
           packetBuffer[1] = messageFlag & 0xFF;
@@ -286,8 +293,11 @@ class BrilliantDevice {
 
       // send the chunk
       await sendDataRaw(packetToSend);
+      // FIXME just seeing if it's a flow rate issue
+      Future.delayed(Duration(milliseconds: 100));
 
       bytesRemaining = payload.length - sentBytes;
+      _log.fine('Bytes remaining: $bytesRemaining');
     }
   }
 

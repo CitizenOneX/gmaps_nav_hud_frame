@@ -36,7 +36,7 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
 
 
   MainAppState() {
-    Logger.root.level = Level.INFO;
+    Logger.root.level = Level.FINE;
     Logger.root.onRecord.listen((record) {
       debugPrint('${record.level.name}: [${record.loggerName}] ${record.time}: ${record.message}');
     });
@@ -183,8 +183,6 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
 
   @override
   Widget build(BuildContext context) {
-    // FIXME remove
-    currentState = ApplicationState.ready;
     return MaterialApp(
       title: 'Frame Navigation HUD',
       theme: ThemeData.dark(),

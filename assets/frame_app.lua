@@ -1,7 +1,7 @@
 -- we store the data from the host quickly from the data handler interrupt
 -- and wait for the main loop to pick it up for processing/drawing
--- `app_data/_raw`.`text` is the text of the turn-by-turn directions in the Google Maps notification
--- `app_data/_raw`.`image` is the directional arrow icon
+-- `app_data/_accum/_block`.`text` is the text of the turn-by-turn directions in the Google Maps notification
+-- `app_data/_accum/_block`.`image` is the directional arrow icon
 
 -- Frame to phone flags
 BATTERY_LEVEL_FLAG = 0x0c
@@ -10,71 +10,116 @@ BATTERY_LEVEL_FLAG = 0x0c
 TEXT_FLAG = 0x0a
 IMAGE_FLAG = 0x0d
 
-local app_data_raw = {}
+local app_data_accum = {}
+local app_data_block = {}
 local app_data = {}
 
 -- Data Handler: called when data arrives, must execute quickly.
--- Update the app_data_raw item based on the contents of the current packet
+-- Update the app_data_accum item based on the contents of the current packet
 -- The first byte of the packet indicates the message type, and the item's key
 -- If the key is not present, initialise a new app data item
 -- Accumulate chunks of data of the specified type, for later processing
-function update_app_data_raw(data)
-    local item = app_data_raw[string.byte(data, 1)]
+function update_app_data_accum(data)
+    local msg_flag = string.byte(data, 1)
+    print('data message: ' .. tostring(msg_flag) .. ', bytes: ' .. tostring(string.len(data)))
+    local item = app_data_accum[msg_flag]
     if item == nil or next(item) == nil then
-        item = { chunk_table = {}, size = 0, recv_bytes = 0 }
-        app_data_raw[string.byte(data, 1)] = item
+        item = { chunk_table = {}, num_chunks = 0, size = 0, recv_bytes = 0 }
+        app_data_accum[msg_flag] = item
+        print('created app data item for:' .. tostring(msg_flag))
     end
 
-    if #item.chunk_table == 0 then
+    if item.num_chunks == 0 then
         -- first chunk of new data contains size (Uint16)
         item.size = string.byte(data, 2) << 8 | string.byte(data, 3)
         item.chunk_table[1] = string.sub(data, 4)
+        item.num_chunks = 1
         item.recv_bytes = string.len(data) - 3
+        print('recv data: ' .. tostring(item.recv_bytes) .. ', ' .. tostring(item.recv_bytes) .. ' of ' .. tostring(item.size))
+
+        if item.recv_bytes == item.size then
+            print('complete message received, single chunk: ' .. tostring(msg_flag))
+            app_data_block[msg_flag] = item.chunk_table[1]
+            item.size = 0
+            item.recv_bytes = 0
+            item.num_chunks = 0
+            item.chunk_table[1] = nil
+            app_data_accum[msg_flag] = item
+        end
     else
-        item.chunk_table[#item.chunk_table + 1] = string.sub(data, 2)
-        item.recv_bytes = string.len(data) - 1
-    end
-end
+        item.chunk_table[item.num_chunks + 1] = string.sub(data, 2)
+        item.num_chunks = item.num_chunks + 1
+        item.recv_bytes = item.recv_bytes + string.len(data) - 1
+        print('recv data: ' .. tostring(string.len(data) - 1) .. ', ' .. tostring(item.recv_bytes) .. ' of ' .. tostring(item.size))
 
--- Works through app_data_raw and if any items are ready, run the corresponding parser
-function process_raw_items()
-    local processed = 0
+        -- if all bytes are received, concat and move message to block
+        -- but don't parse yet
+        if item.recv_bytes == item.size then
+            print('complete message received: ' .. tostring(msg_flag))
+            app_data_block[msg_flag] = table.concat(item.chunk_table)
 
-    for flag, item in pairs(app_data_raw) do
-        if item.size > 0 and item.recv_bytes == item.size then
-            -- parse the app_data_raw item into an app_data item
-            app_data[flag] = parsers[flag](table.concat(item.chunk_table))
-
-            -- then clear out the raw data
             for k, v in pairs(item.chunk_table) do item.chunk_table[k] = nil end
             item.size = 0
             item.recv_bytes = 0
-            processed = processed + 1
+            item.num_chunks = 0
+            app_data_accum[msg_flag] = item
         end
     end
-
-    return processed
 end
 
 -- Parse the text message raw data. If the message had more structure (layout etc.)
 -- we would parse that out here. In this case the data only contains the string
 function parse_text(data)
+    print('parse_text called')
     local text = {}
     text.data = data
     return text
 end
 
 -- Parse the image message raw data. Unpack the header fields.
+-- width(Uint16), height(Uint16), bpp(Uint8), numColors(Uint8), palette (Uint8 r, Uint8 g, Uint8 b)*numColors, data (length width x height x bpp/8)
 function parse_image(data)
+    print('parse_image called')
+    print('data length: ' .. tostring(string.len(data)))
     local image = {}
-    image.width = string.byte(data, 4) << 8 | string.byte(data, 5)
-    image.height = string.byte(data, 6) << 8 | string.byte(data, 7)
-    image.bpp = string.byte(data, 8)
-    image.num_colors = string.byte(data, 9)
-    image.palette = string.sub(data, 10, 10 + 3*image.num_colors - 1)
-    image.size = image.width * image.height * image.bpp / 8
-    image.data = string.sub(data, 10 + 3*image.num_colors)
+    image.width = string.byte(data, 1) << 8 | string.byte(data, 2)
+    print('image.width: ' .. tostring(image.width))
+    image.height = string.byte(data, 3) << 8 | string.byte(data, 4)
+    print('image.height: ' .. tostring(image.height))
+    image.bpp = string.byte(data, 5)
+    print('image.bpp: ' .. tostring(image.bpp))
+    image.num_colors = string.byte(data, 6)
+    image.palette = string.sub(data, 7, 7 + 3*image.num_colors - 1)
+    -- add 7 and do truncating division to round up to next byte
+    -- for partial byte totals on low bpp images
+    image.size = (image.width * image.height * image.bpp + 7) // 8
+    print('image.size: '.. tostring(image.size))
+    image.data = string.sub(data, 7 + 3*image.num_colors)
+    print('image.data.length: ' .. tostring(string.len(image.data)))
     return image
+end
+
+-- register the respective message parsers
+local parsers = {}
+parsers[TEXT_FLAG] = parse_text
+parsers[IMAGE_FLAG] = parse_image
+
+-- Works through app_data_block and if any items are ready, run the corresponding parser
+function process_raw_items()
+    local processed = 0
+
+    for flag, block in pairs(app_data_block) do
+        print('Call parser: ' .. tostring(flag) .. ', bytes: ' .. tostring(string.len(block)))
+        -- parse the app_data_block item into an app_data item
+        app_data[flag] = parsers[flag](block)
+
+        -- then clear out the raw data
+        app_data_block[flag] = nil
+
+        processed = processed + 1
+    end
+
+    return processed
 end
 
 -- draw the current text on the display
@@ -92,8 +137,13 @@ end
 -- draw the image on the display
 -- TODO set palette
 function print_image()
+    print('displaying image')
     local image = app_data[IMAGE_FLAG]
-    frame.display.bitmap(500, 0, image.width, image.num_colors, 0, image.data)
+    print('width: ' .. tostring(image.width))
+    print('height: ' .. tostring(image.height))
+    print('num_colors: ' .. tostring(image.num_colors))
+    print('image.data.length: ' .. tostring(string.len(image.data)))
+    frame.display.bitmap(500, 1, image.width, image.num_colors, 0, image.data)
 end
 
 -- Main app loop
@@ -106,7 +156,7 @@ function app_loop()
                 local items_ready = process_raw_items()
 
                 -- TODO little sleep? (maybe data_handler is even called again, that's okay)
-                frame.sleep(0.02)
+                frame.sleep(0.001)
 
                 -- only need to print it once when it's ready, it will stay there
                 -- but if we print either, then we need to print both because a draw call and show
@@ -121,7 +171,7 @@ function app_loop()
                     frame.display.show()
                 end
 
-                frame.sleep(0.02)
+                frame.sleep(0.001)
 
                 -- periodic battery level updates
                 local t = frame.time.utc()
@@ -145,11 +195,8 @@ function app_loop()
     end
 end
 
--- register the respective message parsers
-local parsers = { TEXT_FLAG = parse_text, IMAGE_FLAG = parse_image }
-
 -- register the handler as a callback for all data sent from the host
-frame.bluetooth.receive_callback(update_app_data_raw)
+frame.bluetooth.receive_callback(update_app_data_accum)
 
 -- run the main app loop
 app_loop()
