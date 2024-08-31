@@ -19,14 +19,13 @@ local app_data = {}
 -- The first byte of the packet indicates the message type, and the item's key
 -- If the key is not present, initialise a new app data item
 -- Accumulate chunks of data of the specified type, for later processing
+-- TODO add reliability features (packet acknowledgement or dropped packet retransmission requests, message and packet sequence numbers)
 function update_app_data_accum(data)
     local msg_flag = string.byte(data, 1)
-    print('data message: ' .. tostring(msg_flag) .. ', bytes: ' .. tostring(string.len(data)))
     local item = app_data_accum[msg_flag]
     if item == nil or next(item) == nil then
         item = { chunk_table = {}, num_chunks = 0, size = 0, recv_bytes = 0 }
         app_data_accum[msg_flag] = item
-        print('created app data item for:' .. tostring(msg_flag))
     end
 
     if item.num_chunks == 0 then
@@ -35,10 +34,8 @@ function update_app_data_accum(data)
         item.chunk_table[1] = string.sub(data, 4)
         item.num_chunks = 1
         item.recv_bytes = string.len(data) - 3
-        print('recv data: ' .. tostring(item.recv_bytes) .. ', ' .. tostring(item.recv_bytes) .. ' of ' .. tostring(item.size))
 
         if item.recv_bytes == item.size then
-            print('complete message received, single chunk: ' .. tostring(msg_flag))
             app_data_block[msg_flag] = item.chunk_table[1]
             item.size = 0
             item.recv_bytes = 0
@@ -50,12 +47,10 @@ function update_app_data_accum(data)
         item.chunk_table[item.num_chunks + 1] = string.sub(data, 2)
         item.num_chunks = item.num_chunks + 1
         item.recv_bytes = item.recv_bytes + string.len(data) - 1
-        print('recv data: ' .. tostring(string.len(data) - 1) .. ', ' .. tostring(item.recv_bytes) .. ' of ' .. tostring(item.size))
 
         -- if all bytes are received, concat and move message to block
         -- but don't parse yet
         if item.recv_bytes == item.size then
-            print('complete message received: ' .. tostring(msg_flag))
             app_data_block[msg_flag] = table.concat(item.chunk_table)
 
             for k, v in pairs(item.chunk_table) do item.chunk_table[k] = nil end
@@ -70,7 +65,6 @@ end
 -- Parse the text message raw data. If the message had more structure (layout etc.)
 -- we would parse that out here. In this case the data only contains the string
 function parse_text(data)
-    print('parse_text called')
     local text = {}
     text.data = data
     return text
@@ -79,23 +73,16 @@ end
 -- Parse the image message raw data. Unpack the header fields.
 -- width(Uint16), height(Uint16), bpp(Uint8), numColors(Uint8), palette (Uint8 r, Uint8 g, Uint8 b)*numColors, data (length width x height x bpp/8)
 function parse_image(data)
-    print('parse_image called')
-    print('data length: ' .. tostring(string.len(data)))
     local image = {}
     image.width = string.byte(data, 1) << 8 | string.byte(data, 2)
-    print('image.width: ' .. tostring(image.width))
     image.height = string.byte(data, 3) << 8 | string.byte(data, 4)
-    print('image.height: ' .. tostring(image.height))
     image.bpp = string.byte(data, 5)
-    print('image.bpp: ' .. tostring(image.bpp))
     image.num_colors = string.byte(data, 6)
     image.palette = string.sub(data, 7, 7 + 3*image.num_colors - 1)
     -- add 7 and do truncating division to round up to next byte
     -- for partial byte totals on low bpp images
     image.size = (image.width * image.height * image.bpp + 7) // 8
-    print('image.size: '.. tostring(image.size))
     image.data = string.sub(data, 7 + 3*image.num_colors)
-    print('image.data.length: ' .. tostring(string.len(image.data)))
     return image
 end
 
@@ -109,7 +96,6 @@ function process_raw_items()
     local processed = 0
 
     for flag, block in pairs(app_data_block) do
-        print('Call parser: ' .. tostring(flag) .. ', bytes: ' .. tostring(string.len(block)))
         -- parse the app_data_block item into an app_data item
         app_data[flag] = parsers[flag](block)
 
@@ -137,12 +123,7 @@ end
 -- draw the image on the display
 -- TODO set palette
 function print_image()
-    print('displaying image')
     local image = app_data[IMAGE_FLAG]
-    print('width: ' .. tostring(image.width))
-    print('height: ' .. tostring(image.height))
-    print('num_colors: ' .. tostring(image.num_colors))
-    print('image.data.length: ' .. tostring(string.len(image.data)))
     frame.display.bitmap(500, 1, image.width, image.num_colors, 0, image.data)
 end
 
@@ -155,8 +136,8 @@ function app_loop()
                 -- process any raw items, if ready (parse into image or text, then clear raw)
                 local items_ready = process_raw_items()
 
-                -- TODO little sleep? (maybe data_handler is even called again, that's okay)
-                frame.sleep(0.001)
+                -- TODO tune sleep durations to optimise for data handler and processing
+                frame.sleep(0.005)
 
                 -- only need to print it once when it's ready, it will stay there
                 -- but if we print either, then we need to print both because a draw call and show
@@ -171,7 +152,8 @@ function app_loop()
                     frame.display.show()
                 end
 
-                frame.sleep(0.001)
+                -- TODO tune sleep durations to optimise for data handler and processing
+                frame.sleep(0.005)
 
                 -- periodic battery level updates
                 local t = frame.time.utc()
