@@ -13,8 +13,10 @@ enum ApplicationState {
   scanning,
   connecting,
   connected,
+  starting,
   ready,
   running,
+  canceling,
   stopping,
   disconnecting,
 }
@@ -61,6 +63,8 @@ mixin SimpleFrameAppState<T extends StatefulWidget> on State<T> {
           case ApplicationState.connected:
           case ApplicationState.ready:
           case ApplicationState.running:
+          case ApplicationState.starting:
+          case ApplicationState.canceling:
             // already connected, nothing to do
             break;
           default:
@@ -95,6 +99,8 @@ mixin SimpleFrameAppState<T extends StatefulWidget> on State<T> {
         // TODO looks like if the signal comes too early after connection, it isn't registered
         await Future.delayed(const Duration(milliseconds: 500));
         await frame!.sendBreakSignal();
+
+        await frame!.sendString('print("Connected to Frame " .. frame.FIRMWARE_VERSION)');
 
         // Frame is ready to go!
         currentState = ApplicationState.connected;
@@ -292,7 +298,9 @@ mixin SimpleFrameAppState<T extends StatefulWidget> on State<T> {
       case ApplicationState.initializing:
       case ApplicationState.scanning:
       case ApplicationState.connecting:
+      case ApplicationState.starting:
       case ApplicationState.running:
+      case ApplicationState.canceling:
       case ApplicationState.stopping:
       case ApplicationState.disconnecting:
         pfb.add(const TextButton(onPressed: null, child: Text('Connect')));
@@ -327,6 +335,9 @@ mixin SimpleFrameAppState<T extends StatefulWidget> on State<T> {
 
   /// the SimpleFrameApp subclass can override with application-specific code if necessary
   Future<void> startApplication() async {
+    currentState = ApplicationState.starting;
+    if (mounted) setState(() {});
+
     // try to get the Frame into a known state by making sure there's no main loop running
     frame!.sendBreakSignal();
     await Future.delayed(const Duration(milliseconds: 500));
@@ -339,26 +350,23 @@ mixin SimpleFrameAppState<T extends StatefulWidget> on State<T> {
         String fileName = pathFile.split('/').last;
         // send the lua script to the Frame
         await frame!.uploadScript(fileName, pathFile);
-        await Future.delayed(const Duration(milliseconds: 500));
       }
 
       // kick off the main application loop: if there is only one lua file, use it;
-      // otherwise require a file called "assets/frame_app.min.lua", or "assets/frame_app.lua"
+      // otherwise require a file called "assets/frame_app.min.lua", or "assets/frame_app.lua".
+      // In that case, the main app file should add require() statements for any dependent modules
       if (luaFiles.length == 1) {
         String fileName = luaFiles[0].split('/').last; // e.g. "assets/my_file.min.lua" -> "my_file.min.lua"
         int lastDotIndex = fileName.lastIndexOf(".lua");
         String bareFileName = fileName.substring(0, lastDotIndex); // e.g. "my_file.min.lua" -> "my_file.min"
 
         await frame!.sendString('require("$bareFileName")', awaitResponse: true);
-        await Future.delayed(const Duration(milliseconds: 500));
       }
       else if (luaFiles.contains('assets/frame_app.min.lua')) {
         await frame!.sendString('require("frame_app.min")', awaitResponse: true);
-        await Future.delayed(const Duration(milliseconds: 500));
       }
       else if (luaFiles.contains('assets/frame_app.lua')) {
         await frame!.sendString('require("frame_app")', awaitResponse: true);
-        await Future.delayed(const Duration(milliseconds: 500));
       }
       else {
         _log.fine('Multiple Lua files uploaded, but no main file to require()');
@@ -371,6 +379,9 @@ mixin SimpleFrameAppState<T extends StatefulWidget> on State<T> {
 
   /// the SimpleFrameApp subclass can override with application-specific code if necessary
   Future<void> stopApplication() async {
+    currentState = ApplicationState.stopping;
+    if (mounted) setState(() {});
+
     // send a break to stop the Lua app loop on Frame
     await frame!.sendBreakSignal();
     await Future.delayed(const Duration(milliseconds: 500));
@@ -381,12 +392,10 @@ mixin SimpleFrameAppState<T extends StatefulWidget> on State<T> {
     if (luaFiles.isNotEmpty) {
       // clean up by deregistering any handler
       await frame!.sendString('frame.bluetooth.receive_callback(nil);print(0)', awaitResponse: true);
-      await Future.delayed(const Duration(milliseconds: 500));
 
       for (var file in luaFiles) {
         // delete any prior scripts
         await frame!.sendString('frame.file.remove("${file.split('/').last}");print(0)', awaitResponse: true);
-        await Future.delayed(const Duration(milliseconds: 500));
       }
     }
 
