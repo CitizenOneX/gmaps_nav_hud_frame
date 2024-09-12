@@ -8,10 +8,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 import 'package:image/image.dart' as img;
 import 'package:logging/logging.dart';
-
-import 'frame_helper.dart';
+import 'package:simple_frame_app/frame_helper.dart';
 import 'frame_image.dart';
-import 'simple_frame_app.dart';
+import 'package:simple_frame_app/simple_frame_app.dart';
 
 void main() => runApp(const MainApp());
 
@@ -120,6 +119,7 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
               _log.finest('QuantizedImage bytes: $qImageBytes');
 
               // send image message (header and image data) to Frame (split over several packets)
+              // TODO convert to Sprite(), remove frame_image.dart
               var imagePayload = makeImagePayload(qImage.width, qImage.height, qImage.palette!.lengthInBytes ~/ 3, qImage.palette!.toUint8List(), qImageBytes);
               _log.finest('Image Payload: ${imagePayload.length} $imagePayload');
 
