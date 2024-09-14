@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:isolate';
 import 'dart:ui';
 
@@ -9,8 +8,9 @@ import 'package:flutter_notification_listener/flutter_notification_listener.dart
 import 'package:image/image.dart' as img;
 import 'package:logging/logging.dart';
 import 'package:simple_frame_app/frame_helper.dart';
-import 'frame_image.dart';
 import 'package:simple_frame_app/simple_frame_app.dart';
+import 'package:simple_frame_app/tx/sprite.dart';
+import 'package:simple_frame_app/tx/text.dart';
 
 void main() => runApp(const MainApp());
 
@@ -94,7 +94,7 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
         String text = '${event.title}\n${event.text}\n${event.raw!["subText"]}';
         if (text != _prevText) {
           String wrappedText = FrameHelper.wrapText(text, 500, 4);
-          await frame?.sendMessage(0x0a, utf8.encode(wrappedText));
+          await frame?.sendMessage(TxPlainText(msgCode: 0x0a, text: wrappedText));
           _prevText = text;
         }
 
@@ -104,7 +104,8 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
 
           if (!listEquals(iconBytes, _prevIcon)) {
             _prevIcon = iconBytes;
-            // TODO if the maps icons are all 2-color bitmaps, maybe we can pack them and send as an indexed file more easily than quantize()?
+            // TODO if the maps icons are all 2-color bitmaps even though they're RGB(A?) bitmaps,
+            // maybe we can pack them and send as an indexed file more easily than having to do quantize()? Or using Image() at all.
             final img.Image? image = img.decodeImage(iconBytes);
 
             // Ensure the image is loaded correctly
@@ -118,12 +119,15 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
               _log.fine('QuantizedImage: ${qImage.width}x${qImage.height}, ${qImage.format}, ${qImage.hasAlpha}, ${qImage.hasPalette}, ${qImage.palette!.toUint8List()}, ${qImage.length}');
               _log.finest('QuantizedImage bytes: $qImageBytes');
 
-              // send image message (header and image data) to Frame (split over several packets)
-              // TODO convert to Sprite(), remove frame_image.dart
-              var imagePayload = makeImagePayload(qImage.width, qImage.height, qImage.palette!.lengthInBytes ~/ 3, qImage.palette!.toUint8List(), qImageBytes);
-              _log.finest('Image Payload: ${imagePayload.length} $imagePayload');
-
-              await frame?.sendMessage(0x0d, imagePayload);
+              // send image message (header and image data) to Frame
+              await frame?.sendMessage(TxSprite(
+                msgCode: 0x0d,
+                width: qImage.width,
+                height: qImage.height,
+                numColors: qImage.palette!.lengthInBytes ~/ 3,
+                paletteData: qImage.palette!.toUint8List(),
+                pixelData: qImageBytes
+              ));
             }
           }
         }
