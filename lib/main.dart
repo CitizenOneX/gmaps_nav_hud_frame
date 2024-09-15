@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 import 'package:image/image.dart' as img;
 import 'package:logging/logging.dart';
-import 'package:simple_frame_app/frame_helper.dart';
+import 'package:simple_frame_app/text_utils.dart';
 import 'package:simple_frame_app/simple_frame_app.dart';
 import 'package:simple_frame_app/tx/sprite.dart';
 import 'package:simple_frame_app/tx/text.dart';
@@ -93,7 +93,7 @@ class MainAppState extends State<MainApp> with SimpleFrameAppState {
         // send text to Frame
         String text = '${event.title}\n${event.text}\n${event.raw!["subText"]}';
         if (text != _prevText) {
-          String wrappedText = FrameHelper.wrapText(text, 500, 4);
+          String wrappedText = TextUtils.wrapText(text, 500, 4);
           await frame?.sendMessage(TxPlainText(msgCode: 0x0a, text: wrappedText));
           _prevText = text;
         }

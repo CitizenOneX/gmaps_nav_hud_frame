@@ -192,7 +192,7 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: "4e8bec4ed6a422f5f567f55ae3c43f1ad6a3238c"
+      resolved-ref: c42a3be3cb2ad4d4c093559f0270dd29e7c4bbb7
       url: "https://github.com/CitizenOneX/simple_frame_app.git"
     source: git
     version: "0.0.1"
