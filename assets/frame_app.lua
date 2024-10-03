@@ -1,14 +1,14 @@
 local data = require('data.min')
 local battery = require('battery.min')
 local sprite = require('sprite.min')
-local text = require('text.min')
+local plain_text = require('plain_text.min')
 
 -- Phone to Frame flags
 TEXT_FLAG = 0x0a
 IMAGE_FLAG = 0x0d
 
 -- register the message parsers so they are automatically called when matching data comes in
-data.parsers[TEXT_FLAG] = text.parse_text
+data.parsers[TEXT_FLAG] = plain_text.parse_plain_text
 data.parsers[IMAGE_FLAG] = sprite.parse_sprite
 
 -- draw the current text on the display

@@ -10,7 +10,7 @@ import 'package:logging/logging.dart';
 import 'package:simple_frame_app/text_utils.dart';
 import 'package:simple_frame_app/simple_frame_app.dart';
 import 'package:simple_frame_app/tx/sprite.dart';
-import 'package:simple_frame_app/tx/text.dart';
+import 'package:simple_frame_app/tx/plain_text.dart';
 
 void main() => runApp(const MainApp());
 

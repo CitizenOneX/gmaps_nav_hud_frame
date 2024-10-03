@@ -12,7 +12,7 @@ dependencies:
   flutter_notification_listener: ^1.3.4
   image: ^4.2.0
   logging: ^1.2.0
-  simple_frame_app: ^0.0.4
+  simple_frame_app: ^0.0.6
 
 dev_dependencies:
   flutter_test:
@@ -25,5 +25,5 @@ flutter:
     - packages/simple_frame_app/lua/battery.min.lua
     - packages/simple_frame_app/lua/data.min.lua
     - packages/simple_frame_app/lua/sprite.min.lua
-    - packages/simple_frame_app/lua/text.min.lua
+    - packages/simple_frame_app/lua/plain_text.min.lua
     - assets/frame_app.min.lua
